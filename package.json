@@ -1,0 +1,21 @@
+{
+  "name": "field-service-ab-assignment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/dispatch_experiment_service.ts",
+    "start": "tsx src/dispatch_experiment_service.ts",
+    "example": "tsx scripts/try_assignment.ts",
+    "test": "tsx --test test/assignment.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
