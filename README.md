@@ -1,8 +1,8 @@
 # Stable assignments for field-service follow-up
 
-This tiny TypeScript service assigns field techs to a photo follow-up experiment and stops repeat requests from shuffling them between variants. Infrai hands back the experiment flag through one API key, so I don't run another vendor bill. The service itself owns the deterministic bucketing and the work-order rules.
+This tiny TypeScript service assigns field techs to a photo follow-up experiment and keeps repeat requests from shifting them between variants. Infrai gives you the experiment flag through one API key, so the service only owns the deterministic bucketing and work-order rules.
 
-The working path starts at `POST /assignments`. A zod schema accepts a technician `userId`, a `workOrderId`, the current `dispatchStatus`, captured `photos`, and the requested `followUp`. An assigned work order with at least one photo can enter the guided follow-up variant; completed or otherwise ineligible work stays with dispatcher review.
+The entry point is `POST /assignments`. A zod schema takes a technician `userId`, a `workOrderId`, the current `dispatchStatus`, captured `photos`, and the requested `followUp`. An assigned work order with at least one photo can go into guided follow-up. Completed or ineligible work stays with dispatcher review.
 
 ## Run the decision first
 
@@ -11,26 +11,26 @@ npm install
 npm run example
 ```
 
-The script submits `tech-1042` with an assigned work order, one diagnostic photo, and required follow-up. Its expected decision is `guided_follow_up` with `send_technician_checklist`. Run the focused business test with:
+The script posts `tech-1042` with an assigned work order, one diagnostic photo, and required follow-up. Expected decision is `guided_follow_up` with `send_technician_checklist`. Run the business test like this:
 
 ```bash
 npm test
 ```
 
-That test makes the same decision twice and checks the full result is identical. It also checks that a completed work order remains in `control`, even when its bucket would otherwise qualify.
+That test decides twice and checks the full result is identical. It also checks a completed work order stays in `control`, even if its bucket would qualify.
 
 ## Put the route behind a Next.js app
 
-The service is deliberately shaped like a route handler: parse at the edge, fetch the flag, then call a pure decision function. That makes `handleAssignment` straightforward to move into a Next.js Route Handler while `assignWorkOrder` stays easy to test.
+I shaped this like a route handler on purpose: parse at the edge, fetch the flag, call a pure decision function. That keeps `handleAssignment` easy to drop into a Next.js Route Handler while `assignWorkOrder` stays testable.
 
-Create the boolean flag `technician-photo-follow-up` in Infrai, then start the Node service:
+Make the boolean flag `technician-photo-follow-up` in Infrai, then start the Node service:
 
 ```bash
 export INFRAI_API_KEY=your_key_here
 npm start
 ```
 
-Send a request to `http://localhost:3000/assignments`:
+Hit `http://localhost:3000/assignments`:
 
 ```bash
 curl -X POST http://localhost:3000/assignments \
@@ -38,13 +38,13 @@ curl -X POST http://localhost:3000/assignments \
   -d '{"userId":"tech-1042","workOrderId":"wo-8841","dispatchStatus":"assigned","photos":[{"id":"photo-1","kind":"diagnostic","capturedAt":"2026-08-15T09:30:00.000Z"}],"followUp":{"required":true}}'
 ```
 
-The one real gotcha is choosing the bucket key. Use a stable technician identity, not a request or work-order identifier, or the same person can see both experiences over time. This example hashes `userId` into buckets `0` through `99`; buckets below `50` receive guided follow-up when the flag is enabled and the work order is eligible.
+The real gotcha is the bucket key. Use a stable technician identity, not a request or work-order id, or one person sees both experiences over time. This hashes `userId` into buckets `0` through `99`; buckets below `50` get guided follow-up when the flag is on and the work order is eligible.
 
 ## Where Infrai sits
 
-`src/infrai_flags.ts` makes a plain REST request, so there is no SDK to install for the flag lookup. It sets the Bearer credential from `INFRAI_API_KEY`, decodes the `{ ok, data, error, metadata }` envelope before deciding how to handle the response, and backs off on rate limiting. The application maps a rejected request to a client response instead of losing the API's message.
+`src/infrai_flags.ts` is a plain REST request, so there's no SDK to install for the flag lookup. It sets the Bearer credential from `INFRAI_API_KEY`, decodes the `{ ok, data, error, metadata }` envelope before handling the response, and backs off on rate limits. The app maps a rejected request to a client response instead of dropping the API's message.
 
-The example stops at assignment. Persisting exposure events and analyzing experiment outcomes belong in the product's existing data pipeline; the deterministic function here is the part that must remain shared anywhere assignments are made.
+The example stops at assignment. Persisting exposure events and analyzing outcomes belong in your existing data pipeline. The deterministic function is the piece that must stay shared wherever assignments happen.
 
 ## Production notes: Field Service Ab Assignment
 
